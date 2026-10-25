@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>キャプチャ録画タイマー</title>
+<style>
+  :root{--bg:#0f1218;--card:#1a1f2b;--line:#2a3142;--text:#e8ecf4;--sub:#8a93a8;--accent:#4f9dff;--rec:#ff4d5e;--ok:#35c98a}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;padding:12px;max-width:760px;margin-inline:auto}
+  h1{font-size:18px;margin:6px 0 12px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
+  label{display:block;font-size:12px;color:var(--sub);margin:8px 0 4px}
+  select,input,button{font:inherit;color:var(--text);background:#10141c;border:1px solid var(--line);border-radius:8px;padding:10px;width:100%}
+  button{cursor:pointer;background:var(--accent);border:none;font-weight:700}
+  button.rec{background:var(--rec)}
+  button.sub{background:#2a3142}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  .row{display:flex;gap:8px}
+  .row>*{flex:1}
+  .time{display:flex;gap:6px;align-items:center}
+  .time input{text-align:center}
+  .time span{color:var(--sub)}
+  video{width:100%;background:#000;border-radius:8px;aspect-ratio:16/9;display:block}
+  .big{font-size:34px;font-weight:800;text-align:center;font-variant-numeric:tabular-nums;margin:8px 0 2px}
+  .big.rec{color:var(--rec)}
+  .small{font-size:12px;color:var(--sub);text-align:center}
+  .meter{height:8px;background:#10141c;border-radius:4px;overflow:hidden;margin-top:8px}
+  .meter i{display:block;height:100%;width:0;background:var(--ok)}
+  .tabs{display:flex;gap:6px;margin-bottom:6px}
+  .tabs button{background:#2a3142;font-weight:500}
+  .tabs button.on{background:var(--accent);font-weight:700}
+  .file{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid var(--line);font-size:13px}
+  .file:first-child{border-top:none}
+  .file a{color:var(--accent);font-weight:700;text-decoration:none;white-space:nowrap}
+  #msg{font-size:13px;color:#ffb86b;min-height:18px;margin-top:6px}
+
+  .intro{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:12px}
+  .intro summary{cursor:pointer;font-weight:700;font-size:14px}
+  .intro-body{font-size:13px;line-height:1.75;color:var(--text);margin-top:6px}
+  .intro-body p{margin:6px 0}
+  .intro-body ol{margin:6px 0;padding-left:22px}
+  .intro-body .note{color:var(--sub);font-size:12px}
+  .layout{display:flex;flex-direction:column}
+  .col{display:contents}
+  .c-prev{order:1}.c-dev{order:2}.c-time{order:3}.c-files{order:4}
+  @media(min-width:900px){
+    body{max-width:1240px;padding:20px 28px}
+    h1{font-size:22px;margin:0 0 14px}
+    .intro{padding:12px 18px}
+    .intro-body{font-size:14px}
+    .layout{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:16px;align-items:start}
+    .col{display:flex;flex-direction:column;min-width:0}
+    .card{padding:16px}
+    .c-prev,.c-dev,.c-time,.c-files{order:0}
+    .c-prev video{max-height:62vh}
+    .big{font-size:44px}
+    button,select,input{padding:11px}
+    button:not(:disabled):hover{filter:brightness(1.12)}
+    .file{font-size:14px}
+  }
+
+  .vol{display:flex;align-items:center;gap:10px;margin-top:10px;font-size:14px}
+  .vol .vl{display:flex;align-items:center;gap:6px;margin:0;color:var(--text);font-size:14px;white-space:nowrap}
+  .vol input[type=range]{flex:1;padding:0;border:none;background:transparent;accent-color:var(--accent);height:24px}
+  .vol span{width:44px;text-align:right;color:var(--sub);font-variant-numeric:tabular-nums;font-size:13px}
+  .subblock{border:1px solid var(--line);border-radius:10px;padding:10px 12px 12px;margin-top:14px;background:#151a25}
+  .sb-title{font-size:12px;font-weight:700;color:var(--accent);margin-bottom:2px}
+</style>
+</head>
+<body>
+<h1>🎥 キャプチャ録画タイマー <span style="font-size:11px;color:var(--sub);font-weight:400">v13</span></h1>
+
+<details class="intro" open>
+  <summary>ℹ️ このツールについて・使い方</summary>
+  <div class="intro-body">
+    <p>USBの外部映像キャプチャデバイスの<b>映像・音声</b>を、<b>終了タイマー</b>付きで録画するツールです。
+    <b>映像＋音声（MP4/WebM）</b>または<b>音声のみ（MP3）</b>で保存でき、MP3では前後の無音を自動カットできます。
+    ブラウザだけで動作し、データは外部に送信されません。</p>
+    <ol>
+      <li><b>① 検出＋プレビュー開始</b>を押し、カメラとマイクの使用を許可します（デバイス検出とプレビューまで自動で行います）。</li>
+      <li><b>映像・音声デバイス</b>や解像度を変えると、プレビューは自動で切り替わります（<b>② プレビュー再開始</b>は手動のやり直し用）。音が出ない／バーが動かないときは音声デバイスを選び直してください。</li>
+      <li><b>録画形式</b>と<b>終了条件</b>（録画時間／終了時刻／無音が続いたら）を設定します。</li>
+      <li><b>● 録画開始</b>を押すとカウントダウン後に録画が始まり、条件を満たすと自動で停止してファイルが保存されます。</li>
+    </ol>
+    <p class="note">※ 録画中はこのタブを閉じない・PCをスリープさせない。Chrome推奨。MP3変換にはインターネット接続（lamejs読み込み）が必要です。</p>
+  </div>
+</details>
+
+<div class="layout">
+<div class="col colL">
+<div class="card c-prev">
+  <video id="preview" autoplay playsinline muted></video>
+  <div class="meter"><i id="level"></i></div>
+  <div class="vol">
+    <label class="vl"><input id="monitor" type="checkbox" style="width:auto" checked> プレビュー音</label>
+    <input id="vol" type="range" min="0" max="100" value="100">
+    <span id="volv">100%</span>
+  </div>
+  <div class="small" style="text-align:left">録画される音声には影響しません。スピーカー使用時はハウリングに注意。</div>
+  <div id="msg"></div>
+</div>
+
+<div class="card c-files">
+  <div style="font-size:13px;color:var(--sub);margin-bottom:4px">録画ファイル</div>
+  <div id="files"><div class="small">まだありません</div></div>
+</div>
+</div>
+<div class="col colR">
+<div class="card c-dev">
+  <button id="btnPerm" class="sub">① 検出＋プレビュー開始（カメラ/マイク許可）</button>
+  <label>映像デバイス（キャプチャデバイス）</label>
+  <select id="vSel"></select>
+  <label>音声デバイス</label>
+  <select id="aSel"></select>
+  <div class="subblock">
+    <div class="sb-title">映像設定とプレビュー</div>
+  <div class="row">
+    <div>
+      <label>解像度</label>
+      <select id="res">
+        <option value="0x0">自動</option>
+        <option value="3840x2160">3840×2160</option>
+        <option value="1920x1080" selected>1920×1080</option>
+        <option value="1280x720">1280×720</option>
+        <option value="640x480">640×480</option>
+      </select>
+    </div>
+    <div>
+      <label>FPS</label>
+      <select id="fps"><option>60</option><option selected>30</option><option>24</option></select>
+    </div>
+    <div>
+      <label>画質(Mbps)</label>
+      <select id="br"><option>4</option><option selected>8</option><option>16</option><option>25</option></select>
+    </div>
+  </div>
+  <button id="btnPrev" style="margin-top:10px">② プレビュー開始</button>
+  </div>
+</div>
+
+<div class="card c-time">
+  <div class="tabs">
+    <button id="tabDur" class="on">録画時間で終了</button>
+    <button id="tabAt">終了時刻で終了</button>
+  </div>
+  <div id="boxDur" class="time">
+    <input id="hh" type="number" min="0" value="0" inputmode="numeric"><span>時間</span>
+    <input id="mm" type="number" min="0" value="30" inputmode="numeric"><span>分</span>
+    <input id="ss" type="number" min="0" value="0" inputmode="numeric"><span>秒</span>
+  </div>
+  <div id="boxAt" style="display:none">
+    <input id="endAt" type="time" step="1">
+    <div class="small" style="text-align:left;margin-top:4px">指定時刻に達したら自動停止（過ぎていれば翌日扱い）</div>
+  </div>
+  <div class="row" style="margin-top:8px">
+    <div><label>分割保存（分ごと・0で無効）</label><input id="split" type="number" min="0" value="0" inputmode="numeric"></div>
+    <div><label>開始前カウントダウン(秒)</label><input id="pre" type="number" min="0" value="3" inputmode="numeric"></div>
+  </div>
+  <div class="row">
+    <div>
+      <label>録画形式</label>
+      <select id="rmode">
+        <option value="video" selected>映像＋音声（MP4/WebM）</option>
+        <option value="mp3">音声のみ（MP3）</option>
+      </select>
+    </div>
+    <div id="kbpsBox" style="display:none">
+      <label>MP3ビットレート</label>
+      <select id="kbps"><option>128</option><option selected>192</option><option>256</option><option>320</option></select>
+    </div>
+  </div>
+  <div style="margin-top:8px">
+    <label style="display:flex;align-items:center;gap:8px;color:var(--text);font-size:14px;margin:0">
+      <input id="silStop" type="checkbox" style="width:auto" checked> 音が出たあと、無音が続いたら自動終了
+    </label>
+    <div class="row">
+      <div><label>無音が続く時間(秒)</label><input id="silSec" type="number" min="1" value="60" inputmode="numeric"></div>
+      <div><label>無音と判定する音量</label>
+        <select id="thr"><option value="-40">-40dB（小さい音も無音扱い）</option><option value="-50" selected>-50dB（標準）</option><option value="-60">-60dB（小さい音まで残す）</option></select>
+      </div>
+    </div>
+    <div class="small" style="text-align:left;margin-top:4px">終了タイマーは上限として働きます（先に無音条件を満たせば、そこで終了）。録音開始後、最初に音が出るまでは無音判定しません。</div>
+  </div>
+  <div id="trimBox" style="display:none;margin-top:8px">
+    <label style="display:flex;align-items:center;gap:8px;color:var(--text);font-size:14px;margin:0">
+      <input id="trim" type="checkbox" style="width:auto" checked> 最初と最後の無音を自動カット
+    </label>
+    <div class="small" style="text-align:left;margin-top:4px">音の前後に約1秒の余白を残します。分割保存時、先頭は最初のパート、末尾は最後のパートだけカットします。</div>
+  </div>
+  <div class="big" id="clock">00:00:00</div>
+  <div class="small" id="info">待機中</div>
+  <div class="row" style="margin-top:10px">
+    <button id="btnRec" class="rec" disabled>● 録画開始</button>
+    <button id="btnStop" class="sub" disabled>■ 停止</button>
+  </div>
+</div>
+</div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+let stream=null, rec=null, chunks=[], timer=null, wake=null, audioCtx=null, raf=0;
+let audioErr=false;
+let mode='dur', endTs=0, startTs=0, partStart=0, stopping=false, partNo=0, mime='';
+const msg=t=>$('msg').textContent=t||'';
+const pad=n=>String(n).padStart(2,'0');
+const fmt=s=>{s=Math.max(0,Math.round(s));return pad(Math.floor(s/3600))+':'+pad(Math.floor(s%3600/60))+':'+pad(s%60)};
+
+// ---- デバイス列挙 ----
+async function listDevices(){
+  const ds=await navigator.mediaDevices.enumerateDevices();
+  const fill=(sel,kind,label)=>{
+    const cur=sel.value; sel.innerHTML='';
+    ds.filter(d=>d.kind===kind).forEach((d,i)=>{
+      const o=document.createElement('option');o.value=d.deviceId;o.textContent=d.label||`${label} ${i+1}`;sel.appendChild(o);
+    });
+    if(cur) sel.value=cur;
+    if(!sel.options.length){const o=document.createElement('option');o.value='';o.textContent='見つかりません';sel.appendChild(o);}
+  };
+  fill($('vSel'),'videoinput','映像');
+  fill($('aSel'),'audioinput','音声');
+}
+function restoreSel(){
+  try{
+    for(const [k,id] of [['cr_v','vSel'],['cr_a','aSel']]){
+      const v=localStorage.getItem(k);
+      if(v&&[...$(id).options].some(o=>o.value===v))$(id).value=v;
+    }
+  }catch(e){}
+}
+function saveSel(){try{localStorage.setItem('cr_v',$('vSel').value);localStorage.setItem('cr_a',$('aSel').value);}catch(e){}}
+const isRecording=()=>!$('btnStop').disabled;
+$('btnPerm').onclick=async()=>{
+  if(isRecording()){msg('録画中は変更できません');return;}
+  let m='',ok=false;
+  try{
+    const t=await navigator.mediaDevices.getUserMedia({video:true,audio:true}); // 映像と音声を同時に許可
+    t.getTracks().forEach(x=>x.stop());
+    m='映像・音声: 許可OK';ok=true;
+  }catch(e){
+    if(e.name==='NotFoundError'){
+      try{
+        const t=await navigator.mediaDevices.getUserMedia({video:true});
+        t.getTracks().forEach(x=>x.stop());
+        m='映像: 許可OK / 音声入力デバイスが見つかりません。';ok=true;
+      }catch(e2){m='許可に失敗: '+e2.name;}
+    }else{
+      m='許可に失敗: '+e.name+(e.name==='NotAllowedError'?'　→ アドレスバー左のアイコン→サイトの設定→カメラ・マイクを「許可」にしてページを再読み込みしてください。':'');
+    }
+  }
+  await listDevices();
+  restoreSel();
+  msg(m);
+  if(ok)await startPreview(); // ②のプレビューまで自動で実行
+};
+navigator.mediaDevices&&navigator.mediaDevices.addEventListener('devicechange',listDevices);
+
+// ---- プレビュー ----
+async function startPreview(){
+  if(isRecording()){msg('録画中は変更できません');return;}
+  stopPreview();
+  const [w,h]=$('res').value.split('x').map(Number);
+  const v={deviceId:$('vSel').value?{exact:$('vSel').value}:undefined,frameRate:{ideal:+$('fps').value}};
+  if(w){v.width={ideal:w};v.height={ideal:h};}
+  // 音声: 選択デバイス指定 → ダメなら既定の入力(true) の順に試す（デバイスIDが空でも音声を要求する）
+  const a=$('aSel').value?{deviceId:{exact:$('aSel').value},echoCancellation:false,noiseSuppression:false,autoGainControl:false}:{echoCancellation:false,noiseSuppression:false,autoGainControl:false};
+  try{
+    try{
+      stream=await navigator.mediaDevices.getUserMedia({video:v,audio:a});
+    }catch(e0){
+      if(e0.name==='NotAllowedError')throw e0;
+      stream=await navigator.mediaDevices.getUserMedia({video:v,audio:true});
+      msg('選択した音声デバイスを開けなかったため、既定の音声入力を使っています。');
+    }
+  }catch(e){
+    try{stream=await navigator.mediaDevices.getUserMedia({video:v,audio:false});msg(`音声の取得に失敗（${e.name}: ${e.message}）。映像のみで開始しました。`);audioErr=true;}
+    catch(e2){msg('プレビュー失敗: '+e2.message);return;}
+  }
+  const pv=$('preview');
+  pv.srcObject=stream;
+  applyMonitor();
+  pv.play().catch(()=>{});
+  const s=stream.getVideoTracks()[0].getSettings();
+  const at=stream.getAudioTracks()[0];
+  $('info').textContent=`映像 ${s.width}×${s.height} @${Math.round(s.frameRate||0)}fps / 音声 ${at?('あり: '+(at.label||'')+(at.muted?'（無信号）':'')):'なし'}`;
+  if(!at&&!audioErr)msg('音声トラックが取得できていません。音声デバイスを選び直して再度プレビューしてください。');
+  audioErr=false;
+  listDevices(); // 許可後はデバイス名が取れるので更新
+  $('btnRec').disabled=false;
+  meter();
+}
+function applyMonitor(){
+  $('preview').muted=!$('monitor').checked;
+  $('preview').volume=(+$('vol').value||0)/100;
+  $('volv').textContent=$('vol').value+'%';
+}
+function saveVol(){try{localStorage.setItem('cr_vol',$('vol').value);localStorage.setItem('cr_mon',$('monitor').checked?'1':'0');}catch(e){}}
+$('vol').oninput=()=>{applyMonitor();saveVol();};
+$('monitor').onchange=()=>{applyMonitor();saveVol();$('preview').play().catch(()=>{});};
+function stopPreview(){
+  cancelAnimationFrame(raf);
+  if(audioCtx){audioCtx.close();audioCtx=null;}
+  if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
+  $('level').style.width='0';
+}
+function meter(){
+  if(!stream||!stream.getAudioTracks().length)return;
+  audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  audioCtx.resume().catch(()=>{});
+  const src=audioCtx.createMediaStreamSource(stream),an=audioCtx.createAnalyser();
+  an.fftSize=512;src.connect(an);
+  const buf=new Uint8Array(an.fftSize);
+  const loop=()=>{
+    an.getByteTimeDomainData(buf);
+    let m=0;for(const b of buf)m=Math.max(m,Math.abs(b-128));
+    $('level').style.width=Math.min(100,m/128*140)+'%';
+    raf=requestAnimationFrame(loop);
+  };loop();
+}
+$('btnPrev').onclick=startPreview;
+for(const id of ['vSel','aSel','res','fps'])$(id).addEventListener('change',()=>{
+  if(id==='vSel'||id==='aSel')saveSel();
+  if(stream&&!isRecording())startPreview(); // プレビュー中なら自動で切り替え
+});
+
+// ---- タブ ----
+$('tabDur').onclick=()=>{mode='dur';$('tabDur').classList.add('on');$('tabAt').classList.remove('on');$('boxDur').style.display='flex';$('boxAt').style.display='none';};
+$('tabAt').onclick=()=>{mode='at';$('tabAt').classList.add('on');$('tabDur').classList.remove('on');$('boxDur').style.display='none';$('boxAt').style.display='block';
+  if(!$('endAt').value){const d=new Date(Date.now()+30*60000);$('endAt').value=`${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;}};
+
+// ---- 録画 ----
+function pickMime(){
+  const c=['video/mp4;codecs=avc1,mp4a.40.2','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
+  return c.find(t=>MediaRecorder.isTypeSupported(t))||'';
+}
+function calcEnd(){
+  if(mode==='dur'){
+    const s=(+$('hh').value||0)*3600+(+$('mm').value||0)*60+(+$('ss').value||0);
+    return s>0?Date.now()+s*1000:0;
+  }
+  const v=$('endAt').value;if(!v)return 0;
+  const [h,m,s]=v.split(':').map(Number);
+  const d=new Date();d.setHours(h,m,s||0,0);
+  if(d.getTime()<=Date.now())d.setDate(d.getDate()+1);
+  return d.getTime();
+}
+async function lockScreen(){try{if('wakeLock'in navigator)wake=await navigator.wakeLock.request('screen');}catch(e){}}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&rec&&rec.state==='recording')lockScreen();});
+
+// ---- MP3 (lamejs) ----
+let audioOnly=false, mp3={ctx:null};
+function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=()=>rej(new Error(src));document.head.appendChild(s);});}
+async function loadLame(){
+  if(window.lamejs)return true;
+  for(const u of ['https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js','https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js']){
+    try{await loadScript(u);if(window.lamejs)return true;}catch(e){}
+  }
+  return false;
+}
+$('rmode').onchange=()=>{
+  $('kbpsBox').style.display=$('rmode').value==='mp3'?'block':'none';
+  $('trimBox').style.display=$('rmode').value==='mp3'?'block':'none';
+  if($('rmode').value==='mp3')loadLame();
+};
+const f2i=a=>{const o=new Int16Array(a.length);for(let i=0;i<a.length;i++){const v=Math.max(-1,Math.min(1,a[i]));o[i]=v<0?v*0x8000:v*0x7FFF;}return o;};
+let soundSeen=false;
+const newEnc=()=>new lamejs.Mp3Encoder(2,mp3.ctx.sampleRate,+$('kbps').value);
+function mp3Feed(P,l,r,loud){
+  const out=P.enc.encodeBuffer(l,r);
+  if(out.length)chunks.push(new Int8Array(out));
+  P.blockEnd.push(chunks.length);
+  if(loud){P.lastLoud=P.blockEnd.length-1;soundSeen=true;}
+  P.blocks++;
+}
+function onMp3Block(e){
+  const P=mp3.P;if(!P)return;
+  const ib=e.inputBuffer,L=ib.getChannelData(0),R=ib.numberOfChannels>1?ib.getChannelData(1):L;
+  let pk=0;
+  for(let i=0;i<L.length;i++){const a=Math.abs(L[i]),b=Math.abs(R[i]);if(a>pk)pk=a;if(b>pk)pk=b;}
+  const loud=pk>P.thr;
+  const l=f2i(L),r=(R===L)?l:f2i(R);
+  if(!P.started){
+    if(!loud){P.pre.push({l,r});if(P.pre.length>P.pad)P.pre.shift();return;} // 先頭の無音は捨てる（直前の余白だけ保持）
+    P.started=true;P.enc=newEnc();
+    for(const b of P.pre)mp3Feed(P,b.l,b.r,false);
+    P.pre=[];
+  }
+  mp3Feed(P,l,r,loud);
+}
+function startMp3Part(){
+  chunks=[];partNo++;partStart=Date.now();
+  if(!mp3.ctx){
+    const ctx=new (window.AudioContext||window.webkitAudioContext)();
+    ctx.resume().catch(()=>{});
+    const src=ctx.createMediaStreamSource(new MediaStream(stream.getAudioTracks()));
+    const proc=ctx.createScriptProcessor(4096,2,2);
+    const mute=ctx.createGain();mute.gain.value=0;
+    src.connect(proc);proc.connect(mute);mute.connect(ctx.destination);
+    mp3={ctx,src,proc,mute,P:null};
+    proc.onaudioprocess=onMp3Block;
+  }
+  const trim=$('trim').checked;
+  const P={enc:null,pre:[],blockEnd:[],lastLoud:-1,blocks:0,trim,
+    thr:Math.pow(10,(+$('thr').value)/20),
+    pad:Math.ceil(1.0*mp3.ctx.sampleRate/4096),
+    started:false};
+  if(!(trim&&!soundSeen)){P.started=true;P.enc=newEnc();} // 先頭カット対象でなければ最初からエンコード
+  mp3.P=P;
+  const r={state:'recording',mimeType:'audio/mpeg'};
+  r.stop=()=>{
+    if(r.state==='inactive')return;
+    r.state='inactive';
+    mp3.P=null;
+    if(!P.started){chunks=[];}
+    else{
+      let flush=true;
+      if(P.trim&&stopping){ // 最後のパートだけ末尾の無音をカット（約1秒の余白を残す）
+        const keep=P.lastLoud<0?0:Math.min(P.blocks,P.lastLoud+1+P.pad);
+        if(keep===0){chunks=[];flush=false;}
+        else if(keep<P.blocks){chunks=chunks.slice(0,P.blockEnd[keep-1]);flush=false;}
+      }
+      if(flush){const t=P.enc.flush();if(t.length)chunks.push(new Int8Array(t));}
+    }
+    onPartStop();
+  };
+  rec=r;
+}
+function closeMp3(){
+  if(mp3.ctx){try{mp3.proc.onaudioprocess=null;mp3.proc.disconnect();mp3.src.disconnect();mp3.mute.disconnect();mp3.ctx.close();}catch(e){}}
+  mp3={ctx:null};
+}
+
+// ---- 無音が続いたら自動終了 ----
+let sil={ctx:null}, lastLoudTs=0, silHeard=false;
+function startSilMon(){
+  stopSilMon();lastLoudTs=Date.now();silHeard=false;
+  if(!$('silStop').checked||!stream||!stream.getAudioTracks().length)return;
+  const ctx=new (window.AudioContext||window.webkitAudioContext)();
+  ctx.resume().catch(()=>{});
+  const src=ctx.createMediaStreamSource(new MediaStream(stream.getAudioTracks()));
+  const proc=ctx.createScriptProcessor(2048,2,2);
+  const mute=ctx.createGain();mute.gain.value=0;
+  src.connect(proc);proc.connect(mute);mute.connect(ctx.destination);
+  const thr=Math.pow(10,(+$('thr').value)/20);
+  proc.onaudioprocess=e=>{
+    const ib=e.inputBuffer;let pk=0;
+    for(let c=0;c<ib.numberOfChannels;c++){const d=ib.getChannelData(c);for(let i=0;i<d.length;i++){const a=Math.abs(d[i]);if(a>pk)pk=a;}}
+    if(pk>thr){lastLoudTs=Date.now();silHeard=true;}
+  };
+  sil={ctx,src,proc,mute};
+}
+function stopSilMon(){
+  if(sil.ctx){try{sil.proc.onaudioprocess=null;sil.proc.disconnect();sil.src.disconnect();sil.mute.disconnect();sil.ctx.close();}catch(e){}}
+  sil={ctx:null};
+}
+$('btnRec').onclick=async()=>{
+  if(!stream)return;
+  audioOnly=$('rmode').value==='mp3';
+  if(audioOnly){
+    if(!stream.getAudioTracks().length){msg('音声トラックがありません。音声デバイスを選んで②プレビューをやり直してください。');return;}
+    msg('MP3エンコーダを読み込み中…');
+    if(!await loadLame()){msg('MP3エンコーダ(lamejs)の読み込みに失敗しました。インターネット接続を確認してください。');return;}
+    msg('');
+  }
+  const target=calcEnd();
+  if(!target){msg('終了条件を設定してください');return;}
+  $('btnRec').disabled=true;$('btnStop').disabled=false;
+  let pre=+$('pre').value||0;
+  while(pre>0){$('clock').textContent=pre;$('info').textContent='まもなく開始…';await new Promise(r=>setTimeout(r,1000));pre--;if($('btnStop').disabled)return;}
+  // カウントダウン後に終了時刻を再計算（時間指定の場合）
+  endTs=mode==='dur'?target+(+$('pre').value||0)*1000:target;
+  mime=pickMime();partNo=0;soundSeen=false;stopping=false;startTs=Date.now();
+  await lockScreen();
+  startPart();
+  startSilMon();
+  $('clock').classList.add('rec');
+  timer=setInterval(tick,200);tick();
+};
+function startPart(){
+  if(audioOnly){startMp3Part();return;}
+  chunks=[];partNo++;partStart=Date.now();
+  const opt={videoBitsPerSecond:(+$('br').value)*1e6};
+  if(mime)opt.mimeType=mime;
+  rec=new MediaRecorder(stream,opt);
+  rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
+  rec.onstop=onPartStop;
+  rec.start(1000);
+}
+function tick(){
+  const now=Date.now();
+  const left=(endTs-now)/1000;
+  $('clock').textContent=fmt(left);
+  $('info').textContent=`● 録画中 経過 ${fmt((now-startTs)/1000)} / パート${partNo}`;
+  if(left<=0){stopAll();return;}
+  if($('silStop').checked&&silHeard&&now-lastLoudTs>=(+$('silSec').value||60)*1000){
+    msg(`無音が${+$('silSec').value||60}秒続いたため自動終了しました。`);
+    stopAll();return;
+  }
+  const sp=(+$('split').value||0)*60000;
+  if(sp&&now-partStart>=sp&&!stopping&&rec.state==='recording'){rec.stop();} // onPartStop で次パートを開始
+}
+function onPartStop(){
+  const type=(rec.mimeType||mime||'video/webm').split(';')[0];
+  const blob=new Blob(chunks,{type});
+  if(chunks.length)addFile(blob,type,partNo);else msg('無音のみのパートは保存しませんでした。');
+  chunks=[];
+  if(!stopping&&Date.now()<endTs&&stream){startPart();}
+  else finish();
+}
+function stopAll(){
+  stopping=true;clearInterval(timer);
+  if(rec&&rec.state!=='inactive')rec.stop();else finish();
+}
+function finish(){
+  clearInterval(timer);
+  closeMp3();
+  stopSilMon();
+  if(wake){wake.release().catch(()=>{});wake=null;}
+  $('clock').classList.remove('rec');
+  $('clock').textContent='00:00:00';
+  $('info').textContent='録画完了';
+  $('btnRec').disabled=!stream;$('btnStop').disabled=true;
+  beep();
+}
+$('btnStop').onclick=()=>{
+  if(rec&&rec.state!=='inactive')stopAll();
+  else{$('btnStop').disabled=true;$('btnRec').disabled=!stream;$('clock').textContent='00:00:00';$('info').textContent='キャンセルしました';}
+};
+function addFile(blob,type,no){
+  const ext=type.includes('mpeg')?'mp3':type.includes('mp4')?'mp4':'webm';
+  const d=new Date(partStart);
+  const name=`capture_${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}_p${no}.${ext}`;
+  const url=URL.createObjectURL(blob);
+  const box=$('files');if(box.querySelector('.small'))box.innerHTML='';
+  const div=document.createElement('div');div.className='file';
+  div.innerHTML=`<span>${name}<br><span style="color:var(--sub)">${(blob.size/1048576).toFixed(1)} MB</span></span>`;
+  const a=document.createElement('a');a.href=url;a.download=name;a.textContent='保存';
+  div.appendChild(a);box.prepend(div);
+  a.click(); // 自動ダウンロード
+}
+function beep(){
+  try{const c=new AudioContext(),o=c.createOscillator(),g=c.createGain();o.connect(g);g.connect(c.destination);g.gain.value=.15;o.frequency.value=880;o.start();setTimeout(()=>{o.stop();c.close();},400);}catch(e){}
+}
+window.addEventListener('beforeunload',e=>{if(rec&&rec.state==='recording'){e.preventDefault();e.returnValue='';}});
+if(!navigator.mediaDevices){msg('このブラウザはカメラAPI非対応です（HTTPSまたはlocalhostで開いてください）');}
+try{ // 音量とモニター設定を復元
+  const v=localStorage.getItem('cr_vol'),m=localStorage.getItem('cr_mon');
+  if(v!==null)$('vol').value=v;
+  if(m!==null)$('monitor').checked=(m==='1');
+}catch(e){}
+applyMonitor();
+(async()=>{
+  try{
+    const c=await navigator.permissions.query({name:'camera'}),m=await navigator.permissions.query({name:'microphone'});
+    if(c.state==='granted'&&m.state==='granted')$('btnPerm').click();
+  }catch(e){}
+})();
+</script>
+</body>
+</html>
