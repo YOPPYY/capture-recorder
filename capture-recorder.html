@@ -66,10 +66,13 @@
   .vol span{width:44px;text-align:right;color:var(--sub);font-variant-numeric:tabular-nums;font-size:13px}
   .subblock{border:1px solid var(--line);border-radius:10px;padding:10px 12px 12px;margin-top:14px;background:#151a25}
   .sb-title{font-size:12px;font-weight:700;color:var(--accent);margin-bottom:2px}
+
+  .saveopt{border-bottom:1px solid var(--line);margin-bottom:6px}
+  .file a{background:#2a3142;padding:8px 12px;border-radius:8px}
 </style>
 </head>
 <body>
-<h1>🎥 キャプチャ録画タイマー <span style="font-size:11px;color:var(--sub);font-weight:400">v13</span></h1>
+<h1>🎥 キャプチャ録画タイマー <span style="font-size:11px;color:var(--sub);font-weight:400">v19</span></h1>
 
 <details class="intro" open>
   <summary>ℹ️ このツールについて・使い方</summary>
@@ -99,10 +102,18 @@
   </div>
   <div class="small" style="text-align:left">録画される音声には影響しません。スピーカー使用時はハウリングに注意。</div>
   <div id="msg"></div>
+  <div id="dbg" class="small" style="text-align:left;white-space:pre-line;margin-top:4px"></div>
 </div>
 
 <div class="card c-files">
-  <div style="font-size:13px;color:var(--sub);margin-bottom:4px">録画ファイル</div>
+  <div style="font-size:13px;color:var(--sub);margin-bottom:6px">録画/録音ファイル</div>
+  <div class="saveopt">
+    <button id="btnDir" class="sub" type="button">📁 保存先フォルダを選ぶ（任意）</button>
+    <div class="small" id="dirName" style="text-align:left;margin-top:4px">未選択：ダウンロードフォルダに保存します</div>
+    <label class="vl" style="display:flex;align-items:center;gap:6px;margin:8px 0 6px;color:var(--text);font-size:13px">
+      <input id="autoDl" type="checkbox" style="width:auto" checked> 録画終了時に自動でダウンロードする（フォルダ未選択時）
+    </label>
+  </div>
   <div id="files"><div class="small">まだありません</div></div>
 </div>
 </div>
@@ -164,6 +175,10 @@
         <option value="video" selected>映像＋音声（MP4/WebM）</option>
         <option value="mp3">音声のみ（MP3）</option>
       </select>
+    </div>
+    <div id="vfmtBox">
+      <label>映像の保存形式</label>
+      <select id="vfmt"><option value="webm" selected>WebM（安定・推奨）</option><option value="mp4">MP4（H.264・環境によっては録画不可）</option></select>
     </div>
     <div id="kbpsBox" style="display:none">
       <label>MP3ビットレート</label>
@@ -331,9 +346,13 @@ $('tabAt').onclick=()=>{mode='at';$('tabAt').classList.add('on');$('tabDur').cla
 
 // ---- 録画 ----
 function pickMime(){
-  const c=['video/mp4;codecs=avc1,mp4a.40.2','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
+  const hasA=!!(stream&&stream.getAudioTracks().length);
+  const mp4=hasA?['video/mp4;codecs=avc1,mp4a.40.2','video/mp4']:['video/mp4;codecs=avc1','video/mp4'];
+  const webm=hasA?['video/webm;codecs=vp8,opus','video/webm;codecs=vp9,opus','video/webm']:['video/webm;codecs=vp8','video/webm;codecs=vp9','video/webm'];
+  const c=$('vfmt').value==='mp4'?mp4.concat(webm):webm.concat(mp4);
   return c.find(t=>MediaRecorder.isTypeSupported(t))||'';
 }
+const dbg=t=>{$('dbg').textContent=t;};
 function calcEnd(){
   if(mode==='dur'){
     const s=(+$('hh').value||0)*3600+(+$('mm').value||0)*60+(+$('ss').value||0);
@@ -360,11 +379,12 @@ async function loadLame(){
 }
 $('rmode').onchange=()=>{
   $('kbpsBox').style.display=$('rmode').value==='mp3'?'block':'none';
+  $('vfmtBox').style.display=$('rmode').value==='mp3'?'none':'block';
   $('trimBox').style.display=$('rmode').value==='mp3'?'block':'none';
   if($('rmode').value==='mp3')loadLame();
 };
 const f2i=a=>{const o=new Int16Array(a.length);for(let i=0;i<a.length;i++){const v=Math.max(-1,Math.min(1,a[i]));o[i]=v<0?v*0x8000:v*0x7FFF;}return o;};
-let soundSeen=false;
+let soundSeen=false, partInfo={real:0,cut:null};
 const newEnc=()=>new lamejs.Mp3Encoder(2,mp3.ctx.sampleRate,+$('kbps').value);
 function mp3Feed(P,l,r,loud){
   const out=P.enc.encodeBuffer(l,r);
@@ -412,16 +432,18 @@ function startMp3Part(){
     if(r.state==='inactive')return;
     r.state='inactive';
     mp3.P=null;
-    if(!P.started){chunks=[];}
+    let kept=P.blocks;
+    if(!P.started){chunks=[];kept=0;}
     else{
       let flush=true;
       if(P.trim&&stopping){ // 最後のパートだけ末尾の無音をカット（約1秒の余白を残す）
         const keep=P.lastLoud<0?0:Math.min(P.blocks,P.lastLoud+1+P.pad);
-        if(keep===0){chunks=[];flush=false;}
-        else if(keep<P.blocks){chunks=chunks.slice(0,P.blockEnd[keep-1]);flush=false;}
+        if(keep===0){chunks=[];flush=false;kept=0;}
+        else if(keep<P.blocks){chunks=chunks.slice(0,P.blockEnd[keep-1]);flush=false;kept=keep;}
       }
       if(flush){const t=P.enc.flush();if(t.length)chunks.push(new Int8Array(t));}
     }
+    partInfo={real:(Date.now()-partStart)/1000,cut:P.trim?kept*4096/mp3.ctx.sampleRate:null};
     onPartStop();
   };
   rec=r;
@@ -470,22 +492,63 @@ $('btnRec').onclick=async()=>{
   while(pre>0){$('clock').textContent=pre;$('info').textContent='まもなく開始…';await new Promise(r=>setTimeout(r,1000));pre--;if($('btnStop').disabled)return;}
   // カウントダウン後に終了時刻を再計算（時間指定の場合）
   endTs=mode==='dur'?target+(+$('pre').value||0)*1000:target;
-  mime=pickMime();partNo=0;soundSeen=false;stopping=false;startTs=Date.now();
+  mime=pickMime();fellBack=false;partNo=0;soundSeen=false;stopping=false;startTs=Date.now();
   await lockScreen();
-  startPart();
-  startSilMon();
-  $('clock').classList.add('rec');
-  timer=setInterval(tick,200);tick();
+  try{
+    startPart();
+    try{startSilMon();}catch(e){msg('無音監視を開始できませんでした: '+e.message);}
+    $('clock').classList.add('rec');
+    timer=setInterval(tick,200);tick();
+  }catch(e){
+    msg(`録画を開始できませんでした: ${e.name}: ${e.message}`);
+    closeMp3();stopSilMon();
+    if(wake){wake.release().catch(()=>{});wake=null;}
+    $('btnRec').disabled=!stream;$('btnStop').disabled=true;
+    $('clock').textContent='00:00:00';$('info').textContent='録画開始に失敗';
+  }
 };
+let rxCount=0,rxBytes=0,fellBack=false;
+function makeRecorder(){
+  const opt={videoBitsPerSecond:(+$('br').value)*1e6};
+  if(mime)opt.mimeType=mime;
+  let r;
+  try{r=new MediaRecorder(stream,opt);}
+  catch(e){try{r=new MediaRecorder(stream,mime?{mimeType:mime}:undefined);}catch(e2){r=new MediaRecorder(stream);}}
+  rec=r;rxCount=0;rxBytes=0;
+  r.ondataavailable=e=>{
+    if(e.data&&e.data.size){chunks.push(e.data);rxCount++;rxBytes+=e.data.size;}
+    dbg(`形式: ${r.mimeType||'(既定)'} ／ データ受信 ${rxCount}回 ${(rxBytes/1048576).toFixed(1)}MB`);
+  };
+  r.onerror=ev=>{
+    const m='録画エラー: '+(ev.error?ev.error.name+' '+ev.error.message:'不明');
+    dbg(m);
+    if(rec===r&&!rxCount)fallbackToWebm(m);
+  };
+  r.onstop=onPartStop;
+  r.start(1000);
+  dbg(`録画開始 形式: ${r.mimeType||'(既定)'}`);
+  const no=partNo;
+  setTimeout(()=>{ // 3.5秒たってもデータが来なければWebMに自動で切り替え
+    if(rec===r&&r.state==='recording'&&no===partNo&&!rxCount)fallbackToWebm('3.5秒間データが届きませんでした');
+  },3500);
+}
+function fallbackToWebm(why){
+  const old=rec;
+  if(fellBack||!old||old.state!=='recording'){msg(why+'。映像ソースが入力されているか確認してください。');return;}
+  fellBack=true;
+  old.onstop=null;old.ondataavailable=null;old.onerror=null;
+  try{old.stop();}catch(e){}
+  const hasA=!!stream.getAudioTracks().length;
+  const w=hasA?['video/webm;codecs=vp8,opus','video/webm']:['video/webm;codecs=vp8','video/webm'];
+  mime=w.find(t=>MediaRecorder.isTypeSupported(t))||'';
+  chunks=[];
+  msg(why+'。WebM（VP8）に切り替えて録画を続けます。');
+  makeRecorder();
+}
 function startPart(){
   if(audioOnly){startMp3Part();return;}
   chunks=[];partNo++;partStart=Date.now();
-  const opt={videoBitsPerSecond:(+$('br').value)*1e6};
-  if(mime)opt.mimeType=mime;
-  rec=new MediaRecorder(stream,opt);
-  rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
-  rec.onstop=onPartStop;
-  rec.start(1000);
+  makeRecorder();
 }
 function tick(){
   const now=Date.now();
@@ -503,7 +566,10 @@ function tick(){
 function onPartStop(){
   const type=(rec.mimeType||mime||'video/webm').split(';')[0];
   const blob=new Blob(chunks,{type});
-  if(chunks.length)addFile(blob,type,partNo);else msg('無音のみのパートは保存しませんでした。');
+  if(!audioOnly)partInfo={real:(Date.now()-partStart)/1000,cut:null};
+  if(chunks.length)addFile(blob,type,partNo);else if(audioOnly)msg('無音のみのパートは保存しませんでした。');
+  else if(mime&&mime.includes('mp4')){$('vfmt').value='webm';msg('この環境ではMP4（H.264）で録画データが得られませんでした。映像の保存形式をWebMに切り替えました。もう一度録画してください。');}
+  else msg('録画データが空だったため保存できませんでした。映像ソースが入力されているか確認してください。');
   chunks=[];
   if(!stopping&&Date.now()<endTs&&stream){startPart();}
   else finish();
@@ -527,22 +593,48 @@ $('btnStop').onclick=()=>{
   if(rec&&rec.state!=='inactive')stopAll();
   else{$('btnStop').disabled=true;$('btnRec').disabled=!stream;$('clock').textContent='00:00:00';$('info').textContent='キャンセルしました';}
 };
-function addFile(blob,type,no){
+let dirHandle=null;
+if(!window.showDirectoryPicker)$('btnDir').style.display='none';
+$('btnDir').onclick=async()=>{
+  try{
+    dirHandle=await window.showDirectoryPicker({mode:'readwrite'});
+    $('dirName').textContent='保存先：'+dirHandle.name+' フォルダ（録画終了時に自動で書き込みます）';
+  }catch(e){if(e.name!=='AbortError')msg('フォルダを選べませんでした: '+e.name+'（デスクトップや書類などの最上位フォルダは選べません。中に作ったフォルダを選んでください）');}
+};
+async function saveToDir(blob,name){
+  const fh=await dirHandle.getFileHandle(name,{create:true});
+  const w=await fh.createWritable();
+  await w.write(blob);await w.close();
+}
+async function addFile(blob,type,no){
   const ext=type.includes('mpeg')?'mp3':type.includes('mp4')?'mp4':'webm';
   const d=new Date(partStart);
   const name=`capture_${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}_p${no}.${ext}`;
   const url=URL.createObjectURL(blob);
   const box=$('files');if(box.querySelector('.small'))box.innerHTML='';
   const div=document.createElement('div');div.className='file';
-  div.innerHTML=`<span>${name}<br><span style="color:var(--sub)">${(blob.size/1048576).toFixed(1)} MB</span></span>`;
-  const a=document.createElement('a');a.href=url;a.download=name;a.textContent='保存';
-  div.appendChild(a);box.prepend(div);
-  a.click(); // 自動ダウンロード
+  const dur=partInfo.cut===null?`録画時間 ${fmt(partInfo.real)}`:`実時間 ${fmt(partInfo.real)} → カット後 ${fmt(partInfo.cut)}`;
+  const left=document.createElement('span');
+  const e=new Date();
+  const endStr=`${e.getFullYear()}/${pad(e.getMonth()+1)}/${pad(e.getDate())} ${pad(e.getHours())}:${pad(e.getMinutes())}:${pad(e.getSeconds())}`;
+  left.innerHTML=`${name}<br><span style="color:var(--sub)">終了 ${endStr} ／ ${dur} ／ ${(blob.size/1048576).toFixed(1)} MB</span><br>`;
+  const st=document.createElement('span');st.style.cssText='font-size:12px';
+  left.appendChild(st);
+  const a=document.createElement('a');a.href=url;a.download=name;a.textContent='💾 保存';
+  div.appendChild(left);div.appendChild(a);box.prepend(div);
+  if(dirHandle){
+    try{await saveToDir(blob,name);st.style.color='var(--ok)';st.textContent='✅ フォルダ「'+dirHandle.name+'」に保存しました';}
+    catch(e){st.style.color='#ff8a8a';st.textContent='⚠ フォルダへの保存に失敗（'+e.name+'）。右の「保存」から手動で保存してください';msg('フォルダへの保存に失敗しました: '+e.name);}
+  }else if($('autoDl').checked){
+    a.click();st.style.color='var(--sub)';st.textContent='自動ダウンロードしました（ダウンロードフォルダを確認。見つからない場合は右の「保存」）';
+  }else{st.style.color='var(--sub)';st.textContent='未保存：右の「保存」を押してください';}
 }
 function beep(){
   try{const c=new AudioContext(),o=c.createOscillator(),g=c.createGain();o.connect(g);g.connect(c.destination);g.gain.value=.15;o.frequency.value=880;o.start();setTimeout(()=>{o.stop();c.close();},400);}catch(e){}
 }
 window.addEventListener('beforeunload',e=>{if(rec&&rec.state==='recording'){e.preventDefault();e.returnValue='';}});
+window.addEventListener('error',e=>msg('エラー: '+e.message));
+window.addEventListener('unhandledrejection',e=>msg('エラー: '+((e.reason&&e.reason.message)||e.reason)));
 if(!navigator.mediaDevices){msg('このブラウザはカメラAPI非対応です（HTTPSまたはlocalhostで開いてください）');}
 try{ // 音量とモニター設定を復元
   const v=localStorage.getItem('cr_vol'),m=localStorage.getItem('cr_mon');
