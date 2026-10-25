@@ -3,7 +3,7 @@
 USB接続の外部映像キャプチャデバイスの**映像・音声**を、**終了タイマー付き**で録画・録音するブラウザツールです。
 単一のHTMLファイル（[`capture-recorder.html`](./capture-recorder.html)）だけで動作し、録画データは外部に送信されません。
 
-👉 **[ツールを開く](./capture-recorder.html)**
+👉 **[ツールを開く]([./capture-recorder.html](https://yoppyy.github.io/capture-recorder/capture-recorder.html))**
 
 ## 目次
 
