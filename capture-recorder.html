@@ -69,10 +69,14 @@
 
   .saveopt{border-bottom:1px solid var(--line);margin-bottom:6px}
   .file a{background:#2a3142;padding:8px 12px;border-radius:8px}
+
+  .pwrbar{display:flex;gap:10px;align-items:center;justify-content:space-between;background:#3a2530;border:1px solid var(--rec);border-radius:8px;padding:8px 10px;margin-top:8px;font-size:14px}
+  .pwrbar button{width:auto;padding:8px 14px}
+  code{background:#10141c;padding:1px 5px;border-radius:4px}
 </style>
 </head>
 <body>
-<h1>🎥 キャプチャ録画タイマー <span style="font-size:11px;color:var(--sub);font-weight:400">v19</span></h1>
+<h1>🎥 キャプチャ録画タイマー <span style="font-size:11px;color:var(--sub);font-weight:400">v20</span></h1>
 
 <details class="intro" open>
   <summary>ℹ️ このツールについて・使い方</summary>
@@ -190,7 +194,7 @@
       <input id="silStop" type="checkbox" style="width:auto" checked> 音が出たあと、無音が続いたら自動終了
     </label>
     <div class="row">
-      <div><label>無音が続く時間(秒)</label><input id="silSec" type="number" min="1" value="60" inputmode="numeric"></div>
+      <div><label>無音が続く時間(秒)</label><input id="silSec" type="number" min="1" value="30" inputmode="numeric"></div>
       <div><label>無音と判定する音量</label>
         <select id="thr"><option value="-40">-40dB（小さい音も無音扱い）</option><option value="-50" selected>-50dB（標準）</option><option value="-60">-60dB（小さい音まで残す）</option></select>
       </div>
@@ -202,6 +206,18 @@
       <input id="trim" type="checkbox" style="width:auto" checked> 最初と最後の無音を自動カット
     </label>
     <div class="small" style="text-align:left;margin-top:4px">音の前後に約1秒の余白を残します。分割保存時、先頭は最初のパート、末尾は最後のパートだけカットします。</div>
+  </div>
+  <div class="subblock">
+    <div class="sb-title">自動終了後のPC操作（要ヘルパー）</div>
+    <div class="row">
+      <div><label>動作</label>
+        <select id="pwr"><option value="none" selected>何もしない</option><option value="sleep">スリープ</option><option value="shutdown">シャットダウン</option></select>
+      </div>
+      <div><label>実行までの猶予(秒)</label><input id="pwrSec" type="number" min="5" value="60" inputmode="numeric"></div>
+    </div>
+    <div class="small" id="pwrStat" style="text-align:left;margin-top:4px"></div>
+    <div id="pwrBar" class="pwrbar" style="display:none"><span id="pwrText"></span><button id="pwrCancel" class="sub" type="button">キャンセル</button></div>
+    <div class="small" style="text-align:left;margin-top:6px;line-height:1.6">タイマー・無音で<b>自動終了したとき</b>だけ実行します（■停止では実行しません）。ブラウザ単体ではPCの電源操作はできないため、付属の <code>capture_helper.py</code> を先に起動してください。保存先フォルダを選んでおくと、保存完了を待ってから実行できて安全です。</div>
   </div>
   <div class="big" id="clock">00:00:00</div>
   <div class="small" id="info">待機中</div>
@@ -476,9 +492,52 @@ function stopSilMon(){
   if(sil.ctx){try{sil.proc.onaudioprocess=null;sil.proc.disconnect();sil.src.disconnect();sil.mute.disconnect();sil.ctx.close();}catch(e){}}
   sil={ctx:null};
 }
+// ---- 自動終了後のPC操作（ヘルパー連携）----
+const HELPER='http://127.0.0.1:8765';
+let autoEnded=false, pendingSaves=0, pwrRun=0;
+const sleepMs=ms=>new Promise(r=>setTimeout(r,ms));
+async function checkHelper(){
+  const st=$('pwrStat');
+  if($('pwr').value==='none'){st.textContent='';return false;}
+  try{
+    const r=await fetch(HELPER+'/ping',{signal:AbortSignal.timeout(2000)});
+    const j=await r.json();
+    st.style.color='var(--ok)';st.textContent='✅ ヘルパーに接続できました'+(j.dryRun?'（dry-run：実際には操作しません）':'');
+    return true;
+  }catch(e){
+    st.style.color='#ffb86b';st.textContent='⚠ ヘルパーに接続できません。capture_helper.py を起動してください。';
+    return false;
+  }
+}
+$('pwr').onchange=()=>{try{localStorage.setItem('cr_pwr',$('pwr').value);localStorage.setItem('cr_pwrsec',$('pwrSec').value);}catch(e){}checkHelper();};
+$('pwrSec').onchange=$('pwr').onchange;
+try{const v=localStorage.getItem('cr_pwr'),t=localStorage.getItem('cr_pwrsec');if(v)$('pwr').value=v;if(t)$('pwrSec').value=t;}catch(e){}
+async function afterFinish(){
+  const act=$('pwr').value;
+  if(act==='none'||!autoEnded)return;
+  const my=++pwrRun;
+  while(pendingSaves>0)await sleepMs(500); // フォルダへの保存完了を待つ
+  const label=act==='sleep'?'スリープ':'シャットダウン';
+  if(!await checkHelper()){msg(`ヘルパーに接続できないため、PCの${label}は実行しませんでした。`);return;}
+  let left=Math.max(5,+$('pwrSec').value||60),cancelled=false;
+  $('pwrBar').style.display='flex';
+  $('pwrCancel').onclick=()=>{cancelled=true;};
+  while(left>0&&!cancelled&&pwrRun===my){
+    $('pwrText').textContent=`${left}秒後にPCを${label}します`;
+    await sleepMs(1000);left--;
+  }
+  $('pwrBar').style.display='none';
+  if(cancelled||pwrRun!==my){msg(`PCの${label}をキャンセルしました。`);return;}
+  try{
+    const r=await fetch(HELPER+'/action',{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:act})});
+    const j=await r.json();
+    msg(j.ok?`PCの${label}を実行します…`:`${label}に失敗しました: ${j.error||''}`);
+  }catch(e){msg(`ヘルパーへの依頼に失敗しました: ${e.message}`);}
+}
 $('btnRec').onclick=async()=>{
   if(!stream)return;
   audioOnly=$('rmode').value==='mp3';
+  autoEnded=false;pwrRun++;$('pwrBar').style.display='none';
   if(audioOnly){
     if(!stream.getAudioTracks().length){msg('音声トラックがありません。音声デバイスを選んで②プレビューをやり直してください。');return;}
     msg('MP3エンコーダを読み込み中…');
@@ -555,10 +614,10 @@ function tick(){
   const left=(endTs-now)/1000;
   $('clock').textContent=fmt(left);
   $('info').textContent=`● 録画中 経過 ${fmt((now-startTs)/1000)} / パート${partNo}`;
-  if(left<=0){stopAll();return;}
-  if($('silStop').checked&&silHeard&&now-lastLoudTs>=(+$('silSec').value||60)*1000){
-    msg(`無音が${+$('silSec').value||60}秒続いたため自動終了しました。`);
-    stopAll();return;
+  if(left<=0){autoEnded=true;stopAll();return;}
+  if($('silStop').checked&&silHeard&&now-lastLoudTs>=(+$('silSec').value||30)*1000){
+    msg(`無音が${+$('silSec').value||30}秒続いたため自動終了しました。`);
+    autoEnded=true;stopAll();return;
   }
   const sp=(+$('split').value||0)*60000;
   if(sp&&now-partStart>=sp&&!stopping&&rec.state==='recording'){rec.stop();} // onPartStop で次パートを開始
@@ -588,6 +647,7 @@ function finish(){
   $('info').textContent='録画完了';
   $('btnRec').disabled=!stream;$('btnStop').disabled=true;
   beep();
+  afterFinish();
 }
 $('btnStop').onclick=()=>{
   if(rec&&rec.state!=='inactive')stopAll();
@@ -623,8 +683,10 @@ async function addFile(blob,type,no){
   const a=document.createElement('a');a.href=url;a.download=name;a.textContent='💾 保存';
   div.appendChild(left);div.appendChild(a);box.prepend(div);
   if(dirHandle){
+    pendingSaves++;
     try{await saveToDir(blob,name);st.style.color='var(--ok)';st.textContent='✅ フォルダ「'+dirHandle.name+'」に保存しました';}
     catch(e){st.style.color='#ff8a8a';st.textContent='⚠ フォルダへの保存に失敗（'+e.name+'）。右の「保存」から手動で保存してください';msg('フォルダへの保存に失敗しました: '+e.name);}
+    finally{pendingSaves--;}
   }else if($('autoDl').checked){
     a.click();st.style.color='var(--sub)';st.textContent='自動ダウンロードしました（ダウンロードフォルダを確認。見つからない場合は右の「保存」）';
   }else{st.style.color='var(--sub)';st.textContent='未保存：右の「保存」を押してください';}
@@ -642,6 +704,7 @@ try{ // 音量とモニター設定を復元
   if(m!==null)$('monitor').checked=(m==='1');
 }catch(e){}
 applyMonitor();
+checkHelper();
 (async()=>{
   try{
     const c=await navigator.permissions.query({name:'camera'}),m=await navigator.permissions.query({name:'microphone'});
