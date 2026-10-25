@@ -3,7 +3,7 @@
 USB接続の外部映像キャプチャデバイスの**映像・音声**を、**終了タイマー付き**で録画・録音するブラウザツールです。
 単一のHTMLファイル（[`capture-recorder.html`](./capture-recorder.html)）だけで動作し、録画データは外部に送信されません。
 
-👉 **[ツールを開く](./capture-recorder.html)**
+👉 **[ツールを開く（GitHub Pages）](https://yoppyy.github.io/capture-recorder/capture-recorder.html)**
 
 ## 目次
 
@@ -34,12 +34,12 @@ USB接続の外部映像キャプチャデバイスの**映像・音声**を、*
 
 - PCのChrome（推奨）
 - カメラとマイクの使用許可が必要です（[Chromeでカメラとマイクを使用する](https://support.google.com/chrome/answer/2693767?hl=ja)）。
-- `https://` または `localhost` で開くのが確実です。`file://` でも動作しますが、許可や設定の保存が保持されないことがあります。
+- `https://` または `localhost` で開くのが確実です（上記の公開ページは `https://` なので、許可や設定が保持されます）。`file://` でも動作しますが、許可や設定の保存が保持されないことがあります。
 - MP3録音は、変換ライブラリ（lamejs）をCDNから読み込むため、インターネット接続が必要です。
 
 ## 使い方
 
-1. [`capture-recorder.html`](./capture-recorder.html) をChromeで開きます。
+1. [公開ページ](https://yoppyy.github.io/capture-recorder/capture-recorder.html) （またはダウンロードした [`capture-recorder.html`](./capture-recorder.html)）をChromeで開きます。
 2. **① 検出＋プレビュー開始** を押し、カメラとマイクの使用を許可します。デバイス検出とプレビューまで自動で行います。
 3. 映像デバイス・音声デバイスを選びます。解像度やFPSを変えると、プレビューは自動で切り替わります。
    - 切り替えをやり直したいときは **② プレビュー再開始** を使います。
