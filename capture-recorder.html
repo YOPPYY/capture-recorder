@@ -73,10 +73,16 @@
   .pwrbar{display:flex;gap:10px;align-items:center;justify-content:space-between;background:#3a2530;border:1px solid var(--rec);border-radius:8px;padding:8px 10px;margin-top:8px;font-size:14px}
   .pwrbar button{width:auto;padding:8px 14px}
   code{background:#10141c;padding:1px 5px;border-radius:4px}
+
+  details.subblock>summary{cursor:pointer;list-style:none;user-select:none}
+  details.subblock>summary::-webkit-details-marker{display:none}
+  details.subblock>summary::before{content:"▸ "}
+  details.subblock[open]>summary::before{content:"▾ "}
+  details.subblock[open]>summary{margin-bottom:2px}
 </style>
 </head>
 <body>
-<h1>🎥 キャプチャ録画タイマー <span style="font-size:11px;color:var(--sub);font-weight:400">v20</span></h1>
+<h1>🎥 キャプチャ録画タイマー <span style="font-size:11px;color:var(--sub);font-weight:400">v29</span></h1>
 
 <details class="intro" open>
   <summary>ℹ️ このツールについて・使い方</summary>
@@ -86,9 +92,9 @@
     ブラウザだけで動作し、データは外部に送信されません。</p>
     <ol>
       <li><b>① 検出＋プレビュー開始</b>を押し、カメラとマイクの使用を許可します（デバイス検出とプレビューまで自動で行います）。</li>
-      <li><b>映像・音声デバイス</b>や解像度を変えると、プレビューは自動で切り替わります（<b>② プレビュー再開始</b>は手動のやり直し用）。音が出ない／バーが動かないときは音声デバイスを選び直してください。</li>
+      <li><b>映像・音声デバイス</b>や解像度を変えると、プレビューは自動で切り替わります（<b>② プレビュー再開始</b>は「映像設定とプレビュー」を開くと表示される、手動のやり直し用）。音が出ない／バーが動かないときは音声デバイスを選び直してください。</li>
       <li><b>録画形式</b>と<b>終了条件</b>（録画時間／終了時刻／無音が続いたら）を設定します。</li>
-      <li><b>● 録画開始</b>を押すとカウントダウン後に録画が始まり、条件を満たすと自動で停止してファイルが保存されます。</li>
+      <li><b>● 録画開始</b>（音声のみのときは<b>● 録音開始</b>）を押すとカウントダウン後に録画・録音が始まり、条件を満たすと自動で停止してファイルが保存されます。</li>
     </ol>
     <p class="note">※ 録画中はこのタブを閉じない・PCをスリープさせない。Chrome推奨。MP3変換にはインターネット接続（lamejs読み込み）が必要です。</p>
   </div>
@@ -128,8 +134,14 @@
   <select id="vSel"></select>
   <label>音声デバイス</label>
   <select id="aSel"></select>
-  <div class="subblock">
-    <div class="sb-title">映像設定とプレビュー</div>
+  <div class="vol" style="margin-top:8px">
+    <label class="vl">録音音量</label>
+    <input id="recVol" type="range" min="0" max="150" value="100">
+    <span id="recVolv">100%</span>
+  </div>
+  <div class="small" style="text-align:left;line-height:1.6">録音・録画される音声の音量です（プレビュー音量とは別）。100%が元の音量で、上げすぎると音が割れます。MP3録音は録音中も変えられます。映像録画は、100%以外にするときは開始前に設定してください。</div>
+  <details class="subblock" id="prevDet">
+    <summary class="sb-title">映像設定とプレビュー（解像度・FPS・画質）</summary>
   <div class="row">
     <div>
       <label>解像度</label>
@@ -150,8 +162,8 @@
       <select id="br"><option>4</option><option selected>8</option><option>16</option><option>25</option></select>
     </div>
   </div>
-  <button id="btnPrev" style="margin-top:10px">② プレビュー開始</button>
-  </div>
+  </details>
+  <button id="btnPrev" class="sub" style="margin-top:10px">② プレビュー再開始</button>
 </div>
 
 <div class="card c-time">
@@ -160,8 +172,8 @@
     <button id="tabAt">終了時刻で終了</button>
   </div>
   <div id="boxDur" class="time">
-    <input id="hh" type="number" min="0" value="0" inputmode="numeric"><span>時間</span>
-    <input id="mm" type="number" min="0" value="30" inputmode="numeric"><span>分</span>
+    <input id="hh" type="number" min="0" value="1" inputmode="numeric"><span>時間</span>
+    <input id="mm" type="number" min="0" value="0" inputmode="numeric"><span>分</span>
     <input id="ss" type="number" min="0" value="0" inputmode="numeric"><span>秒</span>
   </div>
   <div id="boxAt" style="display:none">
@@ -189,23 +201,27 @@
       <select id="kbps"><option>128</option><option selected>192</option><option>256</option><option>320</option></select>
     </div>
   </div>
-  <div style="margin-top:8px">
-    <label style="display:flex;align-items:center;gap:8px;color:var(--text);font-size:14px;margin:0">
+  <div class="subblock">
+    <div class="sb-title">自動終了（無音で終了）</div>
+    <label style="display:flex;align-items:center;gap:8px;color:var(--text);font-size:14px;margin:6px 0 0">
       <input id="silStop" type="checkbox" style="width:auto" checked> 音が出たあと、無音が続いたら自動終了
     </label>
     <div class="row">
       <div><label>無音が続く時間(秒)</label><input id="silSec" type="number" min="1" value="30" inputmode="numeric"></div>
+    </div>
+    <div class="small" style="text-align:left;margin-top:6px;line-height:1.6">終了タイマーは上限として働きます（先に無音条件を満たせば、そこで終了）。録音開始後、最初に音が出るまでは無音判定をしません。無音と判定する音量は下の「無音の設定」で選びます。</div>
+  </div>
+  <div class="subblock">
+    <div class="sb-title">無音の設定</div>
+    <div class="row">
       <div><label>無音と判定する音量</label>
         <select id="thr"><option value="-40">-40dB（小さい音も無音扱い）</option><option value="-50" selected>-50dB（標準）</option><option value="-60">-60dB（小さい音まで残す）</option></select>
       </div>
     </div>
-    <div class="small" style="text-align:left;margin-top:4px">終了タイマーは上限として働きます（先に無音条件を満たせば、そこで終了）。録音開始後、最初に音が出るまでは無音判定しません。</div>
-  </div>
-  <div id="trimBox" style="display:none;margin-top:8px">
-    <label style="display:flex;align-items:center;gap:8px;color:var(--text);font-size:14px;margin:0">
-      <input id="trim" type="checkbox" style="width:auto" checked> 最初と最後の無音を自動カット
+    <label style="display:flex;align-items:center;gap:8px;color:var(--text);font-size:14px;margin:10px 0 0">
+      <input id="trim" type="checkbox" style="width:auto" checked> 最初と最後の無音を自動カット（MP3録音のみ）
     </label>
-    <div class="small" style="text-align:left;margin-top:4px">音の前後に約1秒の余白を残します。分割保存時、先頭は最初のパート、末尾は最後のパートだけカットします。</div>
+    <div class="small" style="text-align:left;margin-top:4px;line-height:1.6">音の前後に約1秒の余白を残します。分割保存時、先頭は最初のパート、末尾は最後のパートだけカットします。</div>
   </div>
   <div class="subblock">
     <div class="sb-title">自動終了後のPC操作（要ヘルパー）</div>
@@ -217,7 +233,7 @@
     </div>
     <div class="small" id="pwrStat" style="text-align:left;margin-top:4px"></div>
     <div id="pwrBar" class="pwrbar" style="display:none"><span id="pwrText"></span><button id="pwrCancel" class="sub" type="button">キャンセル</button></div>
-    <div class="small" style="text-align:left;margin-top:6px;line-height:1.6">タイマー・無音で<b>自動終了したとき</b>だけ実行します（■停止では実行しません）。ブラウザ単体ではPCの電源操作はできないため、付属の <code>capture_helper.py</code> を先に起動してください。保存先フォルダを選んでおくと、保存完了を待ってから実行できて安全です。</div>
+    <div class="small" style="text-align:left;margin-top:6px;line-height:1.6">タイマー・無音（自動終了）で<b>自動終了したとき</b>だけ実行します（■停止では実行しません）。ブラウザ単体ではPCの電源操作はできないため、付属の <code>capture_helper.py</code> を先に起動してください。保存先フォルダを選んでおくと、保存完了を待ってから実行できて安全です。</div>
   </div>
   <div class="big" id="clock">00:00:00</div>
   <div class="small" id="info">待機中</div>
@@ -356,9 +372,16 @@ for(const id of ['vSel','aSel','res','fps'])$(id).addEventListener('change',()=>
 });
 
 // ---- タブ ----
-$('tabDur').onclick=()=>{mode='dur';$('tabDur').classList.add('on');$('tabAt').classList.remove('on');$('boxDur').style.display='flex';$('boxAt').style.display='none';};
-$('tabAt').onclick=()=>{mode='at';$('tabAt').classList.add('on');$('tabDur').classList.remove('on');$('boxDur').style.display='none';$('boxAt').style.display='block';
-  if(!$('endAt').value){const d=new Date(Date.now()+30*60000);$('endAt').value=`${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;}};
+function setMode(m){
+  mode=m;
+  $('tabDur').classList.toggle('on',m==='dur');
+  $('tabAt').classList.toggle('on',m==='at');
+  $('boxDur').style.display=m==='dur'?'flex':'none';
+  $('boxAt').style.display=m==='at'?'block':'none';
+  if(m==='at'&&!$('endAt').value){const d=new Date(Date.now()+60*60000);$('endAt').value=`${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;}
+}
+$('tabDur').onclick=()=>setMode('dur');
+$('tabAt').onclick=()=>setMode('at');
 
 // ---- 録画 ----
 function pickMime(){
@@ -384,7 +407,113 @@ async function lockScreen(){try{if('wakeLock'in navigator)wake=await navigator.w
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&rec&&rec.state==='recording')lockScreen();});
 
 // ---- MP3 (lamejs) ----
-let audioOnly=false, mp3={ctx:null};
+// ---- 音声タップ（AudioWorklet：メインスレッドが忙しくても音を取りこぼさない） ----
+const WORKLET_SRC=`class CapProc extends AudioWorkletProcessor{
+  constructor(){super();this.n=0;this.l=new Float32Array(4096);this.r=new Float32Array(4096);}
+  process(inputs){
+    const i=inputs[0];if(!i||!i.length)return true;
+    const L=i[0],R=i[1]||i[0];
+    for(let k=0;k<L.length;k++){
+      this.l[this.n]=L[k];this.r[this.n]=R[k];this.n++;
+      if(this.n===4096){this.port.postMessage({l:this.l,r:this.r},[this.l.buffer,this.r.buffer]);this.l=new Float32Array(4096);this.r=new Float32Array(4096);this.n=0;}
+    }
+    return true;
+  }
+}
+registerProcessor('cap-proc',CapProc);`;
+// ---- 音声をタイムスタンプ付きで直接読む（別スレッドで実行：画面が固まっても取りこぼさない／途切れは無音で補完） ----
+const TRACK_WORKER=`
+let nextTs=null,bl=new Float32Array(4096),br=new Float32Array(4096),n=0,emitted=0,sr=0,closed=false;
+function emit(l,r){
+  let o=0;
+  while(o<l.length){
+    const c=Math.min(4096-n,l.length-o);
+    bl.set(l.subarray(o,o+c),n);br.set(r.subarray(o,o+c),n);n+=c;o+=c;
+    if(n===4096){const L=bl,R=br;bl=new Float32Array(4096);br=new Float32Array(4096);n=0;emitted++;postMessage({t:'blk',l:L,r:R},[L.buffer,R.buffer]);}
+  }
+}
+function feed(l,r,ts,rate){
+  if(!sr){sr=rate;postMessage({t:'sr',sr});}
+  if(nextTs!==null){
+    const gap=(ts-nextTs)/1e6;
+    if(gap>0.05){
+      postMessage({t:'gap',at:(emitted*4096+n)/rate,sec:gap});
+      let rest=Math.round(gap*rate);
+      while(rest>0){const c=Math.min(rest,4096);const z=new Float32Array(c);emit(z,z);rest-=c;}
+    }
+  }
+  nextTs=ts+l.length/rate*1e6;
+  emit(l,r);
+}
+onmessage=async e=>{
+  if(e.data.t==='close'){closed=true;return;}
+  if(e.data.t==='inject'){if(nextTs!==null)nextTs-=e.data.sec*1e6;return;} // テスト用
+  const reader=e.data.readable.getReader();
+  while(!closed){
+    let r;try{r=await reader.read();}catch(err){break;}
+    if(!r||r.done||!r.value)break;
+    const ad=r.value;
+    try{
+      const nf=ad.numberOfFrames,ch=ad.numberOfChannels;
+      const l=new Float32Array(nf);ad.copyTo(l,{planeIndex:0,format:'f32-planar'});
+      let rr=l;if(ch>1){rr=new Float32Array(nf);ad.copyTo(rr,{planeIndex:1,format:'f32-planar'});}
+      const ts=ad.timestamp,rate=ad.sampleRate;ad.close();
+      feed(l,rr,ts,rate);
+    }catch(err){try{ad.close();}catch(_){}}
+  }
+  try{reader.cancel();}catch(err){}
+};`;
+async function makeTrackTap(onBlock){
+  if(!window.MediaStreamTrackProcessor||!window.Worker)throw new Error('unsupported');
+  const track=stream.getAudioTracks()[0];
+  const proc=new MediaStreamTrackProcessor({track});
+  const url=URL.createObjectURL(new Blob([TRACK_WORKER],{type:'application/javascript'}));
+  const w=new Worker(url);URL.revokeObjectURL(url);
+  const api={kind:'track',sr:0,lostSec:0,gaps:[],w,close(){try{w.postMessage({t:'close'});}catch(e){}setTimeout(()=>{try{w.terminate();}catch(e){}},300);}};
+  let started=false;
+  const ready=new Promise((res,rej)=>{
+    const to=setTimeout(()=>rej(new Error('timeout')),3500);
+    w.onmessage=e=>{
+      const m=e.data;
+      if(m.t==='sr'){api.sr=m.sr;clearTimeout(to);res();}
+      else if(m.t==='blk'){if(started)onBlock(m.l,m.r);else pend.push(m);}
+      else if(m.t==='gap'){api.lostSec+=m.sec;api.gaps.push({at:m.at,sec:m.sec});}
+    };
+    w.onerror=e=>{clearTimeout(to);rej(new Error(e.message||'worker error'));};
+  });
+  const pend=[];
+  w.postMessage({readable:proc.readable},[proc.readable]);
+  try{await ready;}catch(e){api.close();throw e;}
+  if(![32000,44100,48000].includes(api.sr)){api.close();throw new Error('rate '+api.sr);}
+  started=true;for(const m of pend)onBlock(m.l,m.r);
+  return api;
+}
+async function makeTap(onBlock){
+  try{return await makeTrackTap(onBlock);}catch(e){console.warn('track tap unavailable:',e.message);}
+  const ctx=new (window.AudioContext||window.webkitAudioContext)();
+  await ctx.resume().catch(()=>{});
+  const src=ctx.createMediaStreamSource(new MediaStream(stream.getAudioTracks()));
+  const mute=ctx.createGain();mute.gain.value=0;
+  let node,kind;
+  try{
+    const url=URL.createObjectURL(new Blob([WORKLET_SRC],{type:'application/javascript'}));
+    await ctx.audioWorklet.addModule(url);URL.revokeObjectURL(url);
+    node=new AudioWorkletNode(ctx,'cap-proc',{numberOfInputs:1,numberOfOutputs:1,channelCount:2,channelCountMode:'explicit',outputChannelCount:[2]});
+    node.port.onmessage=e=>onBlock(e.data.l,e.data.r);
+    kind='worklet';
+  }catch(e){
+    node=ctx.createScriptProcessor(4096,2,2);
+    node.onaudioprocess=ev=>{const ib=ev.inputBuffer,L=ib.getChannelData(0),R=ib.numberOfChannels>1?ib.getChannelData(1):L;onBlock(new Float32Array(L),new Float32Array(R));};
+    kind='script';
+  }
+  src.connect(node);node.connect(mute);mute.connect(ctx.destination);
+  return {ctx,kind,sr:ctx.sampleRate,close(){
+    try{if(node.port)node.port.onmessage=null;if(node.onaudioprocess)node.onaudioprocess=null;node.disconnect();src.disconnect();mute.disconnect();ctx.close();}catch(e){}
+  }};
+}
+let audioOnly=false, mp3={tap:null};
+const REC=()=>audioOnly?'録音':'録画';
+function updateRecLabels(){$('btnRec').textContent=$('rmode').value==='mp3'?'● 録音開始':'● 録画開始';}
 function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=()=>rej(new Error(src));document.head.appendChild(s);});}
 async function loadLame(){
   if(window.lamejs)return true;
@@ -396,12 +525,13 @@ async function loadLame(){
 $('rmode').onchange=()=>{
   $('kbpsBox').style.display=$('rmode').value==='mp3'?'block':'none';
   $('vfmtBox').style.display=$('rmode').value==='mp3'?'none':'block';
-  $('trimBox').style.display=$('rmode').value==='mp3'?'block':'none';
+  updateRecLabels();
   if($('rmode').value==='mp3')loadLame();
 };
-const f2i=a=>{const o=new Int16Array(a.length);for(let i=0;i<a.length;i++){const v=Math.max(-1,Math.min(1,a[i]));o[i]=v<0?v*0x8000:v*0x7FFF;}return o;};
+const recGain=()=>Math.max(0,(+$('recVol').value||0)/100);
+const f2i=(a,g=1)=>{const o=new Int16Array(a.length);for(let i=0;i<a.length;i++){const v=Math.max(-1,Math.min(1,a[i]*g));o[i]=v<0?v*0x8000:v*0x7FFF;}return o;};
 let soundSeen=false, partInfo={real:0,cut:null};
-const newEnc=()=>new lamejs.Mp3Encoder(2,mp3.ctx.sampleRate,+$('kbps').value);
+const newEnc=()=>new lamejs.Mp3Encoder(2,mp3.tap.sr,+$('kbps').value);
 function mp3Feed(P,l,r,loud){
   const out=P.enc.encodeBuffer(l,r);
   if(out.length)chunks.push(new Int8Array(out));
@@ -409,13 +539,14 @@ function mp3Feed(P,l,r,loud){
   if(loud){P.lastLoud=P.blockEnd.length-1;soundSeen=true;}
   P.blocks++;
 }
-function onMp3Block(e){
+function onMp3Block(L,R){
   const P=mp3.P;if(!P)return;
-  const ib=e.inputBuffer,L=ib.getChannelData(0),R=ib.numberOfChannels>1?ib.getChannelData(1):L;
+  P.recv++; // 受信ブロック数（欠落検出用）
   let pk=0;
   for(let i=0;i<L.length;i++){const a=Math.abs(L[i]),b=Math.abs(R[i]);if(a>pk)pk=a;if(b>pk)pk=b;}
   const loud=pk>P.thr;
-  const l=f2i(L),r=(R===L)?l:f2i(R);
+  const g=recGain(); // 無音判定は元の音量、保存する音にだけ音量を反映
+  const l=f2i(L,g),r=(R===L)?l:f2i(R,g);
   if(!P.started){
     if(!loud){P.pre.push({l,r});if(P.pre.length>P.pad)P.pre.shift();return;} // 先頭の無音は捨てる（直前の余白だけ保持）
     P.started=true;P.enc=newEnc();
@@ -426,20 +557,10 @@ function onMp3Block(e){
 }
 function startMp3Part(){
   chunks=[];partNo++;partStart=Date.now();
-  if(!mp3.ctx){
-    const ctx=new (window.AudioContext||window.webkitAudioContext)();
-    ctx.resume().catch(()=>{});
-    const src=ctx.createMediaStreamSource(new MediaStream(stream.getAudioTracks()));
-    const proc=ctx.createScriptProcessor(4096,2,2);
-    const mute=ctx.createGain();mute.gain.value=0;
-    src.connect(proc);proc.connect(mute);mute.connect(ctx.destination);
-    mp3={ctx,src,proc,mute,P:null};
-    proc.onaudioprocess=onMp3Block;
-  }
   const trim=$('trim').checked;
-  const P={enc:null,pre:[],blockEnd:[],lastLoud:-1,blocks:0,trim,
+  const P={enc:null,pre:[],blockEnd:[],lastLoud:-1,blocks:0,recv:0,trim,
     thr:Math.pow(10,(+$('thr').value)/20),
-    pad:Math.ceil(1.0*mp3.ctx.sampleRate/4096),
+    pad:Math.ceil(1.0*mp3.tap.sr/4096),
     started:false};
   if(!(trim&&!soundSeen)){P.started=true;P.enc=newEnc();} // 先頭カット対象でなければ最初からエンコード
   mp3.P=P;
@@ -459,37 +580,45 @@ function startMp3Part(){
       }
       if(flush){const t=P.enc.flush();if(t.length)chunks.push(new Int8Array(t));}
     }
-    partInfo={real:(Date.now()-partStart)/1000,cut:P.trim?kept*4096/mp3.ctx.sampleRate:null};
+    const sr=mp3.tap.sr,realSec=(Date.now()-partStart)/1000, gotSec=P.recv*4096/sr;
+    if(mp3.tap.kind==='track'){
+      if(mp3.tap.lostSec>0.2){
+        const g=mp3.tap.gaps;
+        msg(`⚠ 音声の途切れを${g.length}回（合計約${mp3.tap.lostSec.toFixed(1)}秒）検出し、無音で埋めました。位置: `+g.slice(0,5).map(x=>`${fmt(x.at)}付近(${x.sec.toFixed(1)}秒)`).join('、')+(g.length>5?' ほか':''));
+      }
+    }else if(realSec>5&&gotSec<realSec*0.98-0.5){ // 実時間より受信した音が少ない＝欠落あり
+      msg(`⚠ 音声が約${Math.round(realSec-gotSec)}秒分欠落した可能性があります（実時間 ${fmt(realSec)} に対して受信 ${fmt(gotSec)}）。PCのスリープやCPU負荷が原因の可能性があります。`);
+    }
+    partInfo={real:realSec,cut:P.trim?kept*4096/sr:null};
     onPartStop();
   };
   rec=r;
 }
 function closeMp3(){
-  if(mp3.ctx){try{mp3.proc.onaudioprocess=null;mp3.proc.disconnect();mp3.src.disconnect();mp3.mute.disconnect();mp3.ctx.close();}catch(e){}}
-  mp3={ctx:null};
+  if(mp3.tap)mp3.tap.close();
+  mp3={tap:null};
+}
+async function ensureMp3Tap(){
+  if(mp3.tap)return;
+  const tap=await makeTap((l,r)=>onMp3Block(l,r));
+  mp3={tap,P:null};
+  dbg('音声の取り込み方式: '+({track:'タイムスタンプ付き直接取得（途切れは無音で補完）',worklet:'AudioWorklet',script:'従来方式（ScriptProcessor）'}[tap.kind])+` ／ ${tap.sr}Hz`);
 }
 
 // ---- 無音が続いたら自動終了 ----
 let sil={ctx:null}, lastLoudTs=0, silHeard=false;
-function startSilMon(){
+async function startSilMon(){
   stopSilMon();lastLoudTs=Date.now();silHeard=false;
   if(!$('silStop').checked||!stream||!stream.getAudioTracks().length)return;
-  const ctx=new (window.AudioContext||window.webkitAudioContext)();
-  ctx.resume().catch(()=>{});
-  const src=ctx.createMediaStreamSource(new MediaStream(stream.getAudioTracks()));
-  const proc=ctx.createScriptProcessor(2048,2,2);
-  const mute=ctx.createGain();mute.gain.value=0;
-  src.connect(proc);proc.connect(mute);mute.connect(ctx.destination);
   const thr=Math.pow(10,(+$('thr').value)/20);
-  proc.onaudioprocess=e=>{
-    const ib=e.inputBuffer;let pk=0;
-    for(let c=0;c<ib.numberOfChannels;c++){const d=ib.getChannelData(c);for(let i=0;i<d.length;i++){const a=Math.abs(d[i]);if(a>pk)pk=a;}}
+  sil=await makeTap((L,R)=>{
+    let pk=0;
+    for(let i=0;i<L.length;i++){const a=Math.abs(L[i]),b=Math.abs(R[i]);if(a>pk)pk=a;if(b>pk)pk=b;}
     if(pk>thr){lastLoudTs=Date.now();silHeard=true;}
-  };
-  sil={ctx,src,proc,mute};
+  });
 }
 function stopSilMon(){
-  if(sil.ctx){try{sil.proc.onaudioprocess=null;sil.proc.disconnect();sil.src.disconnect();sil.mute.disconnect();sil.ctx.close();}catch(e){}}
+  if(sil&&sil.close)sil.close();
   sil={ctx:null};
 }
 // ---- 自動終了後のPC操作（ヘルパー連携）----
@@ -554,25 +683,41 @@ $('btnRec').onclick=async()=>{
   mime=pickMime();fellBack=false;partNo=0;soundSeen=false;stopping=false;startTs=Date.now();
   await lockScreen();
   try{
+    if(audioOnly)await ensureMp3Tap();
     startPart();
-    try{startSilMon();}catch(e){msg('無音監視を開始できませんでした: '+e.message);}
+    try{await startSilMon();}catch(e){msg('無音監視を開始できませんでした: '+e.message);}
     $('clock').classList.add('rec');
     timer=setInterval(tick,200);tick();
   }catch(e){
-    msg(`録画を開始できませんでした: ${e.name}: ${e.message}`);
+    msg(`${REC()}を開始できませんでした: ${e.name}: ${e.message}`);
     closeMp3();stopSilMon();
     if(wake){wake.release().catch(()=>{});wake=null;}
     $('btnRec').disabled=!stream;$('btnStop').disabled=true;
-    $('clock').textContent='00:00:00';$('info').textContent='録画開始に失敗';
+    $('clock').textContent='00:00:00';$('info').textContent=REC()+'開始に失敗';
   }
 };
 let rxCount=0,rxBytes=0,fellBack=false;
+let vgraph=null;
+function recordingStream(){
+  const g=recGain();
+  if(Math.abs(g-1)<0.01||!stream.getAudioTracks().length)return stream;
+  if(!vgraph){
+    const ctx=new (window.AudioContext||window.webkitAudioContext)();ctx.resume().catch(()=>{});
+    const src=ctx.createMediaStreamSource(new MediaStream(stream.getAudioTracks()));
+    const gn=ctx.createGain(),dest=ctx.createMediaStreamDestination();
+    src.connect(gn);gn.connect(dest);
+    vgraph={ctx,gn,out:new MediaStream([...stream.getVideoTracks(),...dest.stream.getAudioTracks()])};
+  }
+  vgraph.gn.gain.value=g;
+  return vgraph.out;
+}
 function makeRecorder(){
+  const rs=recordingStream();
   const opt={videoBitsPerSecond:(+$('br').value)*1e6};
   if(mime)opt.mimeType=mime;
   let r;
-  try{r=new MediaRecorder(stream,opt);}
-  catch(e){try{r=new MediaRecorder(stream,mime?{mimeType:mime}:undefined);}catch(e2){r=new MediaRecorder(stream);}}
+  try{r=new MediaRecorder(rs,opt);}
+  catch(e){try{r=new MediaRecorder(rs,mime?{mimeType:mime}:undefined);}catch(e2){r=new MediaRecorder(rs);}}
   rec=r;rxCount=0;rxBytes=0;
   r.ondataavailable=e=>{
     if(e.data&&e.data.size){chunks.push(e.data);rxCount++;rxBytes+=e.data.size;}
@@ -612,11 +757,12 @@ function startPart(){
 function tick(){
   const now=Date.now();
   const left=(endTs-now)/1000;
+  const silSec=+$('silSec').value||30;
   $('clock').textContent=fmt(left);
-  $('info').textContent=`● 録画中 経過 ${fmt((now-startTs)/1000)} / パート${partNo}`;
+  $('info').textContent=`● ${REC()}中 経過 ${fmt((now-startTs)/1000)} / パート${partNo}`+($('silStop').checked&&silHeard?` ／ 無音 ${Math.floor((now-lastLoudTs)/1000)}/${silSec}秒`:'');
   if(left<=0){autoEnded=true;stopAll();return;}
-  if($('silStop').checked&&silHeard&&now-lastLoudTs>=(+$('silSec').value||30)*1000){
-    msg(`無音が${+$('silSec').value||30}秒続いたため自動終了しました。`);
+  if($('silStop').checked&&silHeard&&now-lastLoudTs>=silSec*1000){
+    msg(`無音が${silSec}秒続いたため自動終了しました。`);
     autoEnded=true;stopAll();return;
   }
   const sp=(+$('split').value||0)*60000;
@@ -639,12 +785,13 @@ function stopAll(){
 }
 function finish(){
   clearInterval(timer);
+  if(vgraph){try{vgraph.ctx.close();}catch(e){}vgraph=null;}
   closeMp3();
   stopSilMon();
   if(wake){wake.release().catch(()=>{});wake=null;}
   $('clock').classList.remove('rec');
   $('clock').textContent='00:00:00';
-  $('info').textContent='録画完了';
+  $('info').textContent=REC()+'完了';
   $('btnRec').disabled=!stream;$('btnStop').disabled=true;
   beep();
   afterFinish();
@@ -673,7 +820,7 @@ async function addFile(blob,type,no){
   const url=URL.createObjectURL(blob);
   const box=$('files');if(box.querySelector('.small'))box.innerHTML='';
   const div=document.createElement('div');div.className='file';
-  const dur=partInfo.cut===null?`録画時間 ${fmt(partInfo.real)}`:`実時間 ${fmt(partInfo.real)} → カット後 ${fmt(partInfo.cut)}`;
+  const dur=partInfo.cut===null?`${REC()}時間 ${fmt(partInfo.real)}`:`実時間 ${fmt(partInfo.real)} → カット後 ${fmt(partInfo.cut)}`;
   const left=document.createElement('span');
   const e=new Date();
   const endStr=`${e.getFullYear()}/${pad(e.getMonth()+1)}/${pad(e.getDate())} ${pad(e.getHours())}:${pad(e.getMinutes())}:${pad(e.getSeconds())}`;
@@ -698,6 +845,43 @@ window.addEventListener('beforeunload',e=>{if(rec&&rec.state==='recording'){e.pr
 window.addEventListener('error',e=>msg('エラー: '+e.message));
 window.addEventListener('unhandledrejection',e=>msg('エラー: '+((e.reason&&e.reason.message)||e.reason)));
 if(!navigator.mediaDevices){msg('このブラウザはカメラAPI非対応です（HTTPSまたはlocalhostで開いてください）');}
+// ---- すべての設定を記憶 ----
+const SET_IDS=[['recVol','value'],['res','value'],['fps','value'],['br','value'],['rmode','value'],['vfmt','value'],['kbps','value'],['trim','checked'],['thr','value'],
+  ['silStop','checked'],['silSec','value'],['split','value'],['pre','value'],['hh','value'],['mm','value'],['ss','value'],['autoDl','checked'],['pwr','value'],['pwrSec','value']];
+function saveAll(){
+  try{
+    const o={};
+    for(const [id,k] of SET_IDS)o[id]=$(id)[k];
+    o.v=2;o.mode=mode;o.prevOpen=$('prevDet').open;
+    localStorage.setItem('cr_settings',JSON.stringify(o));
+  }catch(e){}
+}
+function loadAll(){
+  try{
+    const o=JSON.parse(localStorage.getItem('cr_settings')||'null');
+    if(!o)return;
+    if(o.v!==2){o.hh=1;o.mm=0;o.ss=0;} // 既定の録画時間を1時間に変更（旧設定の30分は引き継がない）
+    if(+o.recVol>150)o.recVol=150;
+    for(const [id,k] of SET_IDS){
+      if(!(id in o))continue;
+      const el=$(id);
+      if(k==='checked')el.checked=!!o[id];
+      else if(el.tagName==='SELECT'){if([...el.options].some(x=>x.value===String(o[id])))el.value=o[id];}
+      else el.value=o[id];
+    }
+    if(o.mode==='at')setMode('at');
+    $('prevDet').open=!!o.prevOpen;
+    $('rmode').onchange();
+  }catch(e){}
+}
+document.addEventListener('change',saveAll);
+document.addEventListener('input',saveAll);
+$('prevDet').addEventListener('toggle',saveAll);
+$('tabDur').addEventListener('click',()=>setTimeout(saveAll,0));
+$('tabAt').addEventListener('click',()=>setTimeout(saveAll,0));
+$('recVol').addEventListener('input',()=>{$('recVolv').textContent=$('recVol').value+'%';if(vgraph)vgraph.gn.gain.value=recGain();});
+loadAll();
+$('recVolv').textContent=$('recVol').value+'%';
 try{ // 音量とモニター設定を復元
   const v=localStorage.getItem('cr_vol'),m=localStorage.getItem('cr_mon');
   if(v!==null)$('vol').value=v;
